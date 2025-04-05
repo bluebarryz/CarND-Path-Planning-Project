@@ -154,4 +154,39 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s,
   return {x,y};
 }
 
+vector<int> getAvailLanes(int curLane) {
+  if (curLane == 0) {
+    return {1};
+  } else if (curLane == 1) {
+    return {0, 2};
+  } else if (curLane == 2) {
+    return {1};
+  }
+}
+
+bool isCarInLane(int targetLane, float d) {
+  return (d < (2+4*targetLane+2) && d > (2+4*targetLane-2));
+}
+
+int getLaneOfCar(float d) {
+  if (isCarInLane(0, d)) {
+    return 0;
+  } else if (isCarInLane(1, d)) {
+    return 1;
+  } else if (isCarInLane(2, d)) {
+    return 2;
+  }
+}
+
+bool isLaneInAvailLanes(int lane, vector<int> availLanes) {
+  for (int l : availLanes) {
+    if (l == lane) return true;
+  }
+  return false;
+}
+
+// double predictCarFuturePos(int egoPrevSize, int carSpeed, double carS ) {
+//   return carS + (double)egoPrevSize * 0.02 * carSpeed;
+// }
+
 #endif  // HELPERS_H
