@@ -185,8 +185,9 @@ bool isLaneInAvailLanes(int lane, vector<int> availLanes) {
   return false;
 }
 
-// double predictCarFuturePos(int egoPrevSize, int carSpeed, double carS ) {
-//   return carS + (double)egoPrevSize * 0.02 * carSpeed;
-// }
+bool isCenteredInLane(float d, int lane) {
+  return (d < (2+4*lane+0.8) && d > (2+4*lane-0.8));
+}
+
 
 #endif  // HELPERS_H
