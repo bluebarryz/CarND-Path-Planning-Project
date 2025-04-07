@@ -9,6 +9,8 @@
 #include "json.hpp"
 #include "spline.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <algorithm>
 
 // for convenience
 using nlohmann::json;
@@ -120,35 +122,18 @@ int main() {
             float d = sensor_fusion[i][6];
             int check_lane = getLaneOfCar(d); // lane of the car we want to check
 
-            if (isLaneInAvailLanes(check_lane, availLanes)) { // check if car is in a lane adjacent to the ego's lane
-              double vx = sensor_fusion[i][3];
-              double vy = sensor_fusion[i][4];
-              double check_speed = sqrt(vx*vx + vy*vy);
-              double check_car_s = sensor_fusion[i][5];
-              
-              // Calculate the check_car's future location
-              check_car_s += (double)prev_size * 0.02 * check_speed;
-              if (check_car_s >= car_s && (check_car_s - car_s) < nextLaneClosestFrontDist[check_lane]){ // car is in front of ego
-                nextLaneClosestFrontDist[check_lane] = check_car_s - car_s;
-              } else if (check_car_s < car_s && (car_s - check_car_s) < nextLaneClosestRearDist[check_lane]){ // car is behind ego
-                nextLaneClosestFrontDist[check_lane] = car_s - check_car_s;
-              } 
-            } else if (check_lane == lane) { // car is in same lane as ego
-              double vx = sensor_fusion[i][3];
-              double vy = sensor_fusion[i][4];
-              double check_speed = sqrt(vx*vx + vy*vy);
-              double check_car_s = sensor_fusion[i][5];
-              
-              // Calculate the check_car's future location
-              check_car_s += (double)prev_size * 0.02 * check_speed;
-              // If the check_car is within 30 meters in front, set too_close flag to true
-              if (check_car_s > car_s && (check_car_s - car_s) < 30){
-                if ((check_car_s - car_s) < curLaneClosestDist) {
-                   curLaneClosestDist = check_car_s - car_s;
-                }
-                too_close = true;
-              } 
-            }
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_car_s = sensor_fusion[i][5];
+            
+            // Calculate the check_car's future location
+            check_car_s += (double)prev_size * 0.02 * check_speed;
+            if (check_car_s >= car_s && (check_car_s - car_s) < nextLaneClosestFrontDist[check_lane]){ // car is in front of ego
+              nextLaneClosestFrontDist[check_lane] = check_car_s - car_s;
+            } else if (check_car_s < car_s && (car_s - check_car_s) < nextLaneClosestRearDist[check_lane]){ // car is behind ego
+              nextLaneClosestRearDist[check_lane] = car_s - check_car_s;
+            }             
           }
           
           // ---------- select optimal lane ---------------
@@ -156,21 +141,58 @@ int main() {
 
           // bestLaneGap: The best lane is the one with the biggest "gap". 
           // We call the "gap" the sum of the distance in front and behind the ego car.
-          int bestLaneGap = 0; 
+          double bestLaneGap = 0; 
 
           // Only consider switching lanes if we're getting too close to front car in same lane.
           // Also check if the car is centered in lane, meaning it isn't currently trying to change lanes.
           //  If there is already a lane change in progress, we don't want to interrupt it and make another lane change
-          if (curLaneClosestDist < 30 && isCenteredInLane(car_d, lane)) { 
-            for (int i : availLanes) {
-              int frontGap = nextLaneClosestFrontDist[i];
-              int rearGap = nextLaneClosestRearDist[i];
-              if (frontGap > 30 && rearGap > 30 && (0.8*frontGap + rearGap) > bestLaneGap) {
-                optimalLane = i;
-                bestLaneGap = frontGap + rearGap;
+          vector<double> laneGap(3, 0);
+          if (nextLaneClosestFrontDist[lane] < 30) { 
+            too_close = true;
+            if (isCenteredInLane(car_d, lane)) {
+              for (int i : availLanes) {
+                double frontGap = nextLaneClosestFrontDist[i];
+                double rearGap = nextLaneClosestRearDist[i];
+                if (frontGap > 30 && rearGap > 25) {
+                  laneGap[i] = frontGap + rearGap;
+                  if ((1.2*frontGap + rearGap) > bestLaneGap) {
+                    optimalLane = i;
+                    bestLaneGap = 1.2*frontGap + rearGap;
+                  }
+                }
+              }
+
+              bool needTieBreaker = false;
+              for (int i : availLanes) {
+                double frontGap = nextLaneClosestFrontDist[i];
+                double rearGap = nextLaneClosestRearDist[i]; 
+                if (i != optimalLane && abs(laneGap[i] - bestLaneGap) < 30 &&
+                    frontGap > 30 && rearGap > 25) {
+                  needTieBreaker = true;
+                }
+              }
+
+              if (needTieBreaker) {
+                std::cout << "needTieBreaker " << optimalLane << std::endl;
+                double bestNeighbourGap = 0;
+                for (int i=0; i < 3; ++i) {
+                  vector<int> availLanesForI = getAvailLanes(i);
+                  for (int l : availLanesForI) {
+                    double frontGap = nextLaneClosestFrontDist[l];
+                    double rearGap = nextLaneClosestRearDist[l]; 
+                    if ((1.2*frontGap + rearGap) - bestNeighbourGap > 50 &&
+                        frontGap > 30 && rearGap > 25) {
+                      bestNeighbourGap = 1.2*frontGap + rearGap;
+                      optimalLane = i;
+                    }
+                  }
+                }
+                std::cout << "done needTieBreaker " << optimalLane << std::endl;
+
               }
             }
           }
+
           lane = optimalLane;
         
           // Create a list of evenly spaced waypoints 30m apart
