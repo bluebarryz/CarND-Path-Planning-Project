@@ -131,7 +131,7 @@ int main() {
               if (check_car_s >= car_s && (check_car_s - car_s) < nextLaneClosestFrontDist[check_lane]){ // car is in front of ego
                 nextLaneClosestFrontDist[check_lane] = check_car_s - car_s;
               } else if (check_car_s < car_s && (car_s - check_car_s) < nextLaneClosestRearDist[check_lane]){ // car is behind ego
-                nextLaneClosestFrontDist[check_lane] = car_s - check_car_s;
+                nextLaneClosestRearDist[check_lane] = car_s - check_car_s;
               } 
             } else if (check_lane == lane) { // car is in same lane as ego
               double vx = sensor_fusion[i][3];
@@ -156,18 +156,18 @@ int main() {
 
           // bestLaneGap: The best lane is the one with the biggest "gap". 
           // We call the "gap" the sum of the distance in front and behind the ego car.
-          int bestLaneGap = 0; 
+          double bestLaneGap = 0; 
 
           // Only consider switching lanes if we're getting too close to front car in same lane.
           // Also check if the car is centered in lane, meaning it isn't currently trying to change lanes.
           //  If there is already a lane change in progress, we don't want to interrupt it and make another lane change
           if (curLaneClosestDist < 30 && isCenteredInLane(car_d, lane)) { 
             for (int i : availLanes) {
-              int frontGap = nextLaneClosestFrontDist[i];
-              int rearGap = nextLaneClosestRearDist[i];
-              if (frontGap > 30 && rearGap > 30 && (0.8*frontGap + rearGap) > bestLaneGap) {
+              double frontGap = nextLaneClosestFrontDist[i];
+              double rearGap = nextLaneClosestRearDist[i];
+              if (frontGap > 30 && rearGap > 25 && (1.2*frontGap + rearGap) > bestLaneGap) {
                 optimalLane = i;
-                bestLaneGap = frontGap + rearGap;
+                bestLaneGap = 1.2*frontGap + rearGap;
               }
             }
           }
