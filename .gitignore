@@ -1,2 +1,4 @@
 build/*
 .vscode/*
+*.mp4
+.DS_Store
